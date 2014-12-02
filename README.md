@@ -81,6 +81,7 @@ Script will use this fact to implement simple caching behavior (will not rebuild
 - Very fast
 - Support caching
 - Quite safe (it doesn't modify /var/lib/docker directly and doesn't remove/change existing images)
+- Doesn't depend on Dockerfile which not always available (for example when image was created from container)
 
 #### Cons:
 - only support aufs
