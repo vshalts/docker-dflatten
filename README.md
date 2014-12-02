@@ -13,8 +13,9 @@ All intermediate data created inside /tmp folder.
 Requirements
 ===============
 Script depend on jq (http://stedolan.github.io/jq/), rsync and aufs
+
 On debian and Ubuntu jq available as standard package:
-sudo apt-get install -y jq
+> sudo apt-get install -y jq
 
 How to use
 ===============
@@ -74,13 +75,13 @@ Image id of generated flatten image is reversed ID of original image. This makes
 Script will use this fact to implement simple caching behavior (will not rebuild flatten image if image with required ID already exist).
 
 
-#### Cons:
+#### Pros:
 - Script correctly flatten any complex layers (including case where original image remove files from parent image)
 - Simple. You can easily modify it for your purpose.
 - Very fast
 - Support caching
 - Quite safe (it doesn't modify /var/lib/docker directly and doesn't remove/change existing images)
 
-#### Pros:
+#### Cons:
 - only support aufs
 - root privileges required (for mount and read access to /var/lib/docker)
