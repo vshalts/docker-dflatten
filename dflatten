@@ -1,0 +1,142 @@
+#!/bin/bash
+
+function containsElement () {
+  local e
+  for e in "${@:2}"; do [[ "$e" == "$1" ]] && return 0; done
+  return 1
+}
+
+function findImages () {
+  jq $1 /var/lib/docker/repositories-aufs | sed "s/\"//g"
+}
+
+function readLayers () {
+  local arr
+  readarray -t arr < <(cat /var/lib/docker/aufs/layers/$1)
+
+  local farr=("$1")
+  farr+=("${arr[@]}")
+  echo ${farr[@]}
+}
+
+function mountLayers () {
+  #declare -a layers=("${!1}")
+  for i in "${!1}"
+  do
+    mount -o remount,append:"/var/lib/docker/aufs/diff/$i/"=ro+wh $2
+  done	
+}
+
+while [[ $# > 1 ]]
+do
+	key="$1"
+	shift
+
+	case $key in
+	    -o|--original)
+        ORIGINAL_ARG="$1"
+	    shift
+	    ;;
+	    -t|--target)
+	    TARGET_ARG="$1"
+	    shift
+	    ;;
+	    *)
+           # unknown option
+	    ;;
+	esac
+done
+
+if [ -z "$ORIGINAL_ARG" ]; then
+	echo "$(basename "$0") -o original_image_name -t target_image_name "
+	exit 1
+fi
+
+arrIN=(${ORIGINAL_ARG//:/ })
+ORIGINAL_NAME=${arrIN[0]}
+ORIGINAL_TAG=${arrIN[1]:=latest}
+
+arrIN=(${TARGET_ARG//:/ })
+TARGET_NAME=${arrIN[0]:=${ORIGINAL_NAME}_flatten}
+TARGET_TAG=${arrIN[1]:=$ORIGINAL_TAG}
+
+TEMP_DIR=`mktemp -d`
+
+### Find tagged images
+readarray -t TAGGED_IMAGES < <(findImages '.["Repositories"]|.[]|.[]')
+
+### Find original image ID
+ORIGINAL_ID=`findImages '.["Repositories"]|.["'$ORIGINAL_NAME'"]|.["'$ORIGINAL_TAG'"]'`
+
+if [ "null" = "$ORIGINAL_ID" ]; then
+	echo "Can't find image $ORIGINAL_NAME:$ORIGINAL_TAG"
+	exit 1
+fi
+
+### Target ID is reverse of original ID, so its stable
+TARGET_ID=`echo $ORIGINAL_ID | rev`
+
+### Do we have image in cache?
+if [ -f "/var/lib/docker/aufs/layers/"$TARGET_ID ]; then
+   echo Using cache
+   echo $TARGET_ID
+   docker tag $TARGET_ID $TARGET_NAME:$TARGET_TAG
+   exit 0
+else
+   echo Flatten image to $TARGET_ID
+fi
+
+### Find all layers of original image
+ORIGINAL_LAYERS=( $(readLayers $ORIGINAL_ID) )
+ORIGINAL_PARENT_ID=${ORIGINAL_LAYERS[1]}
+
+### Find parent ID
+for i in "${ORIGINAL_LAYERS[@]:1}"
+do
+	containsElement $i "${TAGGED_IMAGES[@]}"
+	if [ "$?" == "0" ]
+	then
+		PARENT_ID=$i
+		break
+	fi
+done
+
+### Find parent images
+PARENT_LAYERS=( $(readLayers $PARENT_ID) )
+
+### Make temp folders
+ORIGINAL_DIR=$TEMP_DIR/source
+FLATTEN_DIR=$TEMP_DIR/flatten
+
+mkdir $FLATTEN_DIR
+mkdir $ORIGINAL_DIR
+mkdir $TEMP_DIR/empty
+mkdir $TEMP_DIR/diff
+
+### Recovery original image
+mount -t aufs -o ro,br:$TEMP_DIR/empty none $ORIGINAL_DIR
+mountLayers ORIGINAL_LAYERS[@] $ORIGINAL_DIR
+
+### Build diff
+mount -t aufs -o rw,br:$TEMP_DIR/diff/=rw none $FLATTEN_DIR
+mountLayers PARENT_LAYERS[@] $FLATTEN_DIR
+
+rsync -aAXvq --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} --delete "$ORIGINAL_DIR/" $FLATTEN_DIR
+
+umount $FLATTEN_DIR
+umount $ORIGINAL_DIR
+
+### Build tar for load
+LL_DIR=$TEMP_DIR/result/$TARGET_ID
+
+mkdir -p $LL_DIR
+tar -cpf $LL_DIR/layer.tar --numeric-owner -C $TEMP_DIR/diff .
+echo 1.0 > $LL_DIR/VERSION
+cat /var/lib/docker/graph/$ORIGINAL_ID/json | sed s/$ORIGINAL_ID/$TARGET_ID/g | sed s/$ORIGINAL_PARENT_ID/$PARENT_ID/g > $LL_DIR/json
+echo '{"'$TARGET_NAME'":{"'$TARGET_TAG'":"'$TARGET_ID'"}}' > $TEMP_DIR/result/repositories
+
+tar -cpf $TEMP_DIR/tmp.tar --numeric-owner -C $TEMP_DIR/result .
+
+docker load < $TEMP_DIR/tmp.tar
+
+rm -r $TEMP_DIR
