@@ -39,7 +39,7 @@ Warning: '-tree' is deprecated, it will be removed soon. See usage.
             └─10ebd1d649cb Virtual Size: 204.4 MB
               └─5db917407faa Virtual Size: 345.8 MB
                 └─745d3ac92697 Virtual Size: 345.8 MB Tags: phusion/baseimage:0.9.9
-                  ├─22865bb012e7 Virtual Size: <b>345.8</b> MB Tags: <b>vshalts/general_flatten:latest</b>
+                  ├─22865bb012e7 Virtual Size: <b>388.9</b> MB Tags: <b>vshalts/general_flatten:latest</b>
                   └─c18b95098dea Virtual Size: 345.8 MB
                     └─3f420d29853d Virtual Size: 345.8 MB
                       └─3ea7162b6a47 Virtual Size: 348.6 MB
@@ -50,7 +50,8 @@ Warning: '-tree' is deprecated, it will be removed soon. See usage.
                                 └─3d2c2ec3ece3 Virtual Size: 513.9 MB
                                   └─b06ef8c3fc3a Virtual Size: <b>513.9</b> MB Tags: <b>vshalts/general:latest</b>
 </pre>
-Here flatten image 22865bb012e7 was created and size was reduced from 513.9 down to 345.8.
+Here flatten image 22865bb012e7 was created and size was reduced from 513.9 down to 388.9
+(Just in case. Dockerfile.readme_sample was used for this sample).
 
 
 By default script will add '_flatten' to specified image name. But you can overwrite this behavior and define required target image name with -t option:

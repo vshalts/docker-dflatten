@@ -1,0 +1,28 @@
+FROM phusion/baseimage:0.9.9
+MAINTAINER  Vadim Shalts <vshalts@gmail.com>
+
+# Set correct environment variables.
+ENV HOME /root
+
+# Regenerate SSH host keys. baseimage-docker does not contain any, so you
+# have to do that yourself. You may also comment out this instruction; the
+# init system will auto-generate one during boot.
+RUN /etc/my_init.d/00_regen_ssh_host_keys.sh
+
+# Use baseimage-docker's init system.
+CMD ["/sbin/my_init"]
+
+# RUN /usr/bin/workaround-docker-2267
+
+# ...put your own build instructions here...
+
+RUN apt-get update
+RUN apt-get install -y software-properties-common
+RUN apt-get install -y mc
+
+RUN /sbin/ip route|awk '/default/ { print $3 }' | sudo tee /etc/container_environment/HOST_IP > /dev/null
+# RUN echo Acquire::http::Proxy '"http://'`sudo cat /etc/host_ip`':3142";' | sudo tee /etc/apt/apt.conf.d/90-apt-proxy.conf > /dev/null
+
+
+# Clean up APT when done.
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
