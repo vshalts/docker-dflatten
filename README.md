@@ -14,7 +14,7 @@ Requirements
 ===============
 Script depend on jq (http://stedolan.github.io/jq/), rsync and aufs
 
-On debian and Ubuntu jq available as standard package:
+On debian and Ubuntu jq is available as standard package:
 > sudo apt-get install -y jq
 
 How to use
